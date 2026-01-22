@@ -1,24 +1,19 @@
 import torch
 from PIL import Image
+import gradio as gr
 from transformers import AutoProcessor, AutoModelForImageTextToText
 from peft import PeftModel
 
 # --------------------
-# Paths (MINIMAL FIX)
+# Paths (MINIMAL FIX ONLY)
 # --------------------
 BASE_MODEL_PATH = "google/medgemma-1.5-4b-it"   # ✅ download from Hugging Face
-LORA_MODEL_PATH = "./outputs/medgemma-lora"     # ✅ where Trainer saves adapters
-IMAGE_PATH = "./data/images/xray1.jpeg"         # test image
+LORA_MODEL_PATH = "./outputs/medgemma-lora"     # ✅ Trainer output directory
 
 # --------------------
-# Load base model and processor
+# Load model and processor
 # --------------------
-print("Loading base model and processor...")
-
-processor = AutoProcessor.from_pretrained(
-    BASE_MODEL_PATH,
-    use_fast=False
-)
+processor = AutoProcessor.from_pretrained(BASE_MODEL_PATH, use_fast=False)
 
 base_model = AutoModelForImageTextToText.from_pretrained(
     BASE_MODEL_PATH,
@@ -26,65 +21,66 @@ base_model = AutoModelForImageTextToText.from_pretrained(
     device_map="auto"
 )
 
-# --------------------
-# Apply LoRA adapter
-# --------------------
-print("Applying LoRA adapter...")
-
-model = PeftModel.from_pretrained(
-    base_model,
-    LORA_MODEL_PATH
-)
-
-# FP32 for stable generation (important)
+model = PeftModel.from_pretrained(base_model, LORA_MODEL_PATH)
 model = model.to(torch.float32)
 model.eval()
 
 # --------------------
-# Prepare input
+# Prediction function
 # --------------------
-image = Image.open(IMAGE_PATH).convert("RGB")
+def predict(image: Image.Image):
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image"},
+                {
+                    "type": "text",
+                    "text": "You are a medical imaging expert. Describe the findings in this medical image."
+                },
+            ],
+        }
+    ]
 
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "image"},
-            {
-                "type": "text",
-                "text": "You are a medical imaging expert. Describe the findings in this medical image."
-            },
-        ],
-    }
-]
-
-prompt = processor.apply_chat_template(
-    messages,
-    tokenize=False,
-    add_generation_prompt=True,
-)
-
-inputs = processor(
-    text=prompt,
-    images=image,
-    return_tensors="pt",
-    truncation=True,
-    max_length=512,
-)
-
-# --------------------
-# Generate caption
-# --------------------
-with torch.no_grad():
-    outputs = model.generate(
-        **{k: v.to(model.device) for k, v in inputs.items()},
-        max_new_tokens=128,
-        do_sample=False
+    prompt = processor.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
     )
 
+    inputs = processor(
+        text=prompt,
+        images=image.convert("RGB"),
+        return_tensors="pt",
+        truncation=True,
+        max_length=512,
+    )
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **{k: v.to(model.device) for k, v in inputs.items()},
+            max_new_tokens=128,
+            do_sample=False
+        )
+
+    caption = processor.decode(outputs[0], skip_special_tokens=True)
+    return caption
+
 # --------------------
-# Decode output
+# Gradio interface
 # --------------------
-answer = processor.decode(outputs[0], skip_special_tokens=True)
-print("Predicted Caption:")
-print(answer)
+demo = gr.Interface(
+    fn=predict,
+    inputs=gr.Image(type="pil"),
+    outputs=gr.Textbox(
+        label="Predicted Caption",
+        lines=15,
+        max_lines=1000,
+        interactive=False,
+        placeholder="The caption will appear here..."
+    ),
+    title="MedGemma LoRA - Medical Image Captioning",
+    description="Upload a chest X-ray, MRI, or CT scan and get a medical description."
+)
+
+demo.launch(server_name="0.0.0.0", server_port=7860, share=True)
