@@ -9,7 +9,11 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model
 
-MODEL_PATH = "./models/medgemma-1.5-4b-it"
+# ====================
+# MODEL CONFIG (FIXED)
+# ====================
+MODEL_ID = "google/medgemma-1.5-4b-it"
+
 TRAIN_JSON = "./dataset/train.json"
 VAL_JSON = "./dataset/val.json"
 OUTPUT_DIR = "./outputs/medgemma-lora"
@@ -17,12 +21,12 @@ OUTPUT_DIR = "./outputs/medgemma-lora"
 print("Loading base model and processor...")
 
 processor = AutoProcessor.from_pretrained(
-    MODEL_PATH,
+    MODEL_ID,
     use_fast=False
 )
 
 model = AutoModelForImageTextToText.from_pretrained(
-    MODEL_PATH,
+    MODEL_ID,
     torch_dtype=torch.float16,
     device_map="auto"
 )
@@ -138,7 +142,7 @@ dataset = dataset.map(
 )
 
 # --------------------
-# Data collator (Gemma3 / LoRA) – FIXED
+# Data collator (Gemma3 / LoRA)
 # --------------------
 def data_collator(features):
     return {
@@ -157,9 +161,15 @@ def data_collator(features):
             batch_first=True,
             padding_value=-100,
         ),
-        "pixel_values": torch.stack([f["pixel_values"] if isinstance(f["pixel_values"], torch.Tensor) else torch.tensor(f["pixel_values"]) for f in features]),
+        "pixel_values": torch.stack(
+            [
+                f["pixel_values"]
+                if isinstance(f["pixel_values"], torch.Tensor)
+                else torch.tensor(f["pixel_values"])
+                for f in features
+            ]
+        ),
     }
-
 
 # --------------------
 # Training
@@ -176,8 +186,8 @@ training_args = TrainingArguments(
     save_steps=50,
     save_total_limit=2,
     report_to="none",
-    remove_unused_columns=False,   # important for custom forward
-    label_names=["labels"],        # important for Trainer
+    remove_unused_columns=False,
+    label_names=["labels"],
     eval_strategy="steps",
     eval_steps=50,
 )
