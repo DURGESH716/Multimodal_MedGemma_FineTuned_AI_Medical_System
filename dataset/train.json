@@ -1,1 +1,18 @@
-
+[
+    {
+        "image": "data/images/xray1.jpeg",
+        "caption": "X-ray showing healthy lungs."
+    },
+    {
+        "image": "data/images/ct2.jpeg",
+        "caption": "CT scan showing normal lung tissue."
+    },
+    {
+        "image": "data/images/ct1.jpeg",
+        "caption": "CT scan with small lesion in left lung."
+    },
+    {
+        "image": "data/images/mri2.jpg",
+        "caption": "MRI scan showing mild temporal lobe swelling."
+    }
+]
