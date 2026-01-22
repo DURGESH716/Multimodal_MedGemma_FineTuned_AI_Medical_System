@@ -1,1 +1,6 @@
-
+[
+    {
+        "image": "data/images/mri1.png",
+        "caption": "MRI scan showing normal brain anatomy."
+    }
+]
