@@ -9,9 +9,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model
 
-# ====================
-# MODEL CONFIG (FIXED)
-# ====================
+
 MODEL_ID = "google/medgemma-1.5-4b-it"
 
 TRAIN_JSON = "./dataset/train.json"
@@ -31,9 +29,7 @@ model = AutoModelForImageTextToText.from_pretrained(
     device_map="auto"
 )
 
-# --------------------
-# Apply LoRA
-# --------------------
+
 print("Applying LoRA...")
 
 lora_config = LoraConfig(
@@ -48,9 +44,7 @@ lora_config = LoraConfig(
 model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
 
-# --------------------
-# Load Dataset
-# --------------------
+
 print("Loading dataset...")
 
 dataset = load_dataset(
@@ -61,9 +55,7 @@ dataset = load_dataset(
     },
 )
 
-# --------------------
-# Preprocess (Gemma3-compatible)
-# --------------------
+
 def preprocess(example):
     image = Image.open(example["image"]).convert("RGB")
     answer = example["caption"]
@@ -90,7 +82,7 @@ def preprocess(example):
         add_generation_prompt=True,
     )
 
-    # Encode prompt + image
+
     prompt_inputs = processor(
         text=prompt,
         images=image,
@@ -99,7 +91,7 @@ def preprocess(example):
         max_length=512,
     )
 
-    # Encode answer only (text-only)
+
     answer_inputs = processor.tokenizer(
         answer,
         return_tensors="pt",
@@ -141,9 +133,7 @@ dataset = dataset.map(
     remove_columns=dataset["train"].column_names,
 )
 
-# --------------------
-# Data collator (Gemma3 / LoRA)
-# --------------------
+
 def data_collator(features):
     return {
         "input_ids": torch.nn.utils.rnn.pad_sequence(
@@ -171,9 +161,6 @@ def data_collator(features):
         ),
     }
 
-# --------------------
-# Training
-# --------------------
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=1,
